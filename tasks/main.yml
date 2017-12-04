@@ -1,0 +1,94 @@
+---
+
+- name: Obtain subnet facts
+  ec2_vpc_subnet_facts:
+    aws_access_key: "{{ aws_ec2_aws_access_key }}"
+    aws_secret_key: "{{ aws_ec2_aws_secret_key }}"
+    region:         "{{ aws_ec2_aws_region }}"
+    filters:
+      "tag:Name": "{{ aws_ec2_subnet }}"
+  register: subnet_facts
+    
+- debug:
+    var: subnet_facts
+
+- name: Store subnet id as a fact
+  set_fact:
+    subnet_id: "{{ subnet_facts.subnets.0.id }}"
+
+- name: Store vpc id as a fact
+  set_fact:
+    vpc_id: "{{ subnet_facts.subnets.0.vpc_id }}"
+
+- name: Check if the instance already exists (using name+project query)
+  ec2_instance_facts:
+    aws_access_key: "{{ aws_ec2_aws_access_key }}"
+    aws_secret_key: "{{ aws_ec2_aws_secret_key }}"
+    region:         "{{ aws_ec2_aws_region }}"
+    filters:
+      "instance-state-name": ["stopped","stopping","running","pending","shutting-down"]
+      "tag:Name": "{{ aws_ec2_name }}"
+      "tag:Project": "{{ aws_ec2_tag_project }}"
+  register: ec2_query
+
+- name: Get user_data for instance
+  set_fact:
+    user_data: "{{ lookup('template', aws_ec2_user_data) }}"
+  when: aws_ec2_user_data != None
+
+- name: Create instance (if it does not exist)
+  ec2:
+    aws_access_key: "{{ aws_ec2_aws_access_key }}"
+    aws_secret_key: "{{ aws_ec2_aws_secret_key }}"
+    region:         "{{ aws_ec2_aws_region }}"
+    key_name:       "{{ aws_ec2_key }}"
+    instance_type:  "{{ aws_ec2_instance_type }}"
+    image:          "{{ aws_ec2_image }}"
+    wait:           True
+    vpc_subnet_id:  "{{ subnet_id }}"
+    group:          "{{ aws_ec2_security_groups }}"
+    user_data:      "{{ user_data | default(omit) }}"
+    instance_tags:
+      Name:    "{{ aws_ec2_name }}"
+      Project: "{{ aws_ec2_tag_project }}"
+  when: ec2_query.instances is defined and not ec2_query.instances
+  register: ec2
+
+- name: Store new private ip address as a fact
+  set_fact:
+    private_ip: "{{ ec2.instances.0.private_ip }}"
+  when: aws_ec2_create_dns == True
+        and ec2.instances is defined and ec2.instances
+
+- name: Store existing private ip address as a fact
+  set_fact:
+    private_ip: "{{ ec2_query.instances.0.private_ip_address }}"
+    public_ip: "{{ ec2_query.instances.0.public_ip_address | default (omit) }}"
+  when: aws_ec2_create_dns == True
+        and ec2_query.instances is defined and ec2_query.instances
+
+- debug: 
+    var: private_ip
+
+- name: Ensure a DNS A record exists.
+  route53:
+    aws_access_key: "{{ aws_ec2_aws_access_key }}"
+    aws_secret_key: "{{ aws_ec2_aws_secret_key }}"
+    vpc_id:         "{{ vpc_id }}"
+    state:          present
+    zone:           "{{ aws_ec2_dns_domain }}"
+    record:         "{{ aws_ec2_name }}.{{ aws_ec2_tag_project }}.{{ aws_ec2_dns_domain }}"
+    type:           A
+    value:          "{{ private_ip }}"
+    private_zone:   True
+    overwrite:      True
+    wait:           True
+  when: aws_ec2_create_dns == True
+        and private_ip is defined
+
+- name: Ensure the instance is in the specified ansible groups in the inventory
+  add_host:
+    hostname: "{{ public_ip }}"
+    groups:   "{{ aws_ec2_ansible_groups }}"
+  when: aws_ec2_ansible_groups and public_ip is defined
+
