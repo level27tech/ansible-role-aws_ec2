@@ -30,32 +30,40 @@ The role includes the following defaults:
 
 *Note that these credentials should be kept private as they can be used to gain access to your AWS environment.
 It is recommended that these variables be encrypted with Ansible Vault.  See https://docs.ansible.com/ansible/2.4/ansible-vault.html for details.*
+
 aws_ec2_aws_access_key: ABCDEFGHI
 aws_ec2_aws_secret_key: ABCDEFGHI
 
 **AWS Region**
 
 *The region in which to create the EC2 instance*
+
 aws_ec2_region: us-east-1
 
 **EC2 Instance Attributes**
 
 *The name of the EC2 instance*
+
 aws_ec2_name: MyEC2Instance
 
 *The ami image id for the EC2 instance*
+
 aws_ec2_image: ami-bb9a6bc2
 
 *The subnet for the EC2 instance*
+
 aws_ec2_subnet: sub_public_a
 
 *The keypair to use for the EC2 instance*
+
 aws_ec2_key: mykey
 
 *The instance type for the EC2 instance*
+
 aws_ec2_instance_type: t2.micro
 
 *A list of security groups for this EC2 instance*
+
 aws_ec2_security_groups:
 
 aws_ec2_user_data:
@@ -63,20 +71,24 @@ aws_ec2_user_data:
 **Tags**
 
 *The value to use for the Project tag*
+
 aws_ec2_tag_project: MyProject
 
 **DNS Information**
 
 *If you wish to register a private DNS name for this EC2 instance
 set aws_ec2_create_dns to True*
+
 aws_ec2_create_dns: False
 
 *If aws_ec2_create_dns is True, the name of the DNS zone (optional)*
+
 aws_ec2_dns_domain: example.com
 
 **Ansible Groups**
 
 *A list of ansible groups to add this host to (optional)*
+
 aws_ec2_ansible_groups:
 
 The role includes no variables (vars).
