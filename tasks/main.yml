@@ -54,21 +54,25 @@
   when: ec2_query.instances is defined and not ec2_query.instances
   register: ec2
 
-- name: Store new private ip address as a fact
-  set_fact:
-    private_ip: "{{ ec2.instances.0.private_ip }}"
-  when: aws_ec2_create_dns == True
-        and ec2.instances is defined and ec2.instances
-
 - name: Store existing private ip address as a fact
   set_fact:
     private_ip: "{{ ec2_query.instances.0.private_ip_address }}"
-    public_ip: "{{ ec2_query.instances.0.public_ip_address | default (omit) }}"
-  when: aws_ec2_create_dns == True
-        and ec2_query.instances is defined and ec2_query.instances
+    public_ip: "{{ ec2_query.instances.0.public_ip_address | default ('') }}"
+  when: ec2_query.instances is defined and ec2_query.instances
+
+- name: Store new private ip address as a fact
+  set_fact:
+    private_ip: "{{ ec2.instances.0.private_ip }}"
+    public_ip: "{{ ec2.instances.0.public_ip_address | default ('') }}"
+  when: ec2.instances is defined and ec2.instances
 
 - debug: 
-    var: private_ip
+    var: "{{instance}}"
+  loop_control:
+    loop_var: instance
+  with_items:
+    - public_ip
+    - private_ip
 
 - name: Ensure a DNS A record exists.
   route53:
@@ -90,5 +94,11 @@
   add_host:
     hostname: "{{ public_ip }}"
     groups:   "{{ aws_ec2_ansible_groups }}"
-  when: aws_ec2_ansible_groups and public_ip is defined
+  when: aws_ec2_ansible_groups and public_ip != ""
+
+- name: Ensure the instance is in the specified ansible groups (private ip)
+  add_host:
+    hostname: "{{ private_ip }}"
+    groups:   "{{ aws_ec2_ansible_groups }}"
+  when: aws_ec2_ansible_groups and public_ip == ""
 
